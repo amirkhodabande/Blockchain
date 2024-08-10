@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+option go_package = "github.com/blockchain";
+
+service BlockChain {
+    rpc Handshake(HandshakeMessage) returns (HandshakeMessage);
+    rpc HandleTransaction(Transaction) returns (Ack);
+}
+
+message HandshakeMessage {
+    string version = 1;
+    int32 height = 2;
+}
+
+message Ack {}
+
+message Block {
+    Header header = 1;
+    repeated Transaction transactions = 2;
+}
+
+message Header {
+    int32 version = 1;
+    int32 height = 2;
+    bytes previousHash = 3;
+    bytes rootHash = 4;
+    int64 timestamp = 5;
+}
+
+message TxInput {
+    // the previous hash of the transacrtion containing, output we want to spend
+    bytes previousTxHash = 1;
+    // the index of previous transaction's output, we want want to spend
+    uint32 previousOutIndex = 2;
+    bytes publicKey = 3;
+    bytes signature = 4;
+}
+
+message TxOutput {
+    int64 amount = 1;
+    bytes address = 2;
+}
+
+message Transaction {
+    int32 version = 1;
+    repeated TxInput inputs = 2;
+    repeated TxOutput outputs = 3;
+}
