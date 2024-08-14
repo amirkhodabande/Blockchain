@@ -10,6 +10,7 @@ service BlockChain {
 message HandshakeMessage {
     string version = 1;
     int32 height = 2;
+    string listenAddress = 3;
 }
 
 message Ack {}

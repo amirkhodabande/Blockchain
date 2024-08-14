@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net"
 	"time"
 
 	blockchain "github.com/blockchain/proto"
@@ -14,27 +12,29 @@ import (
 )
 
 func main() {
+	makeServer(":3000", []string{})
+	makeServer(":4300", []string{":3000"})
+
+	// go func() {
+	// 	for {
+	// 		time.Sleep(2 * time.Second)
+	// 		makeTransaction()
+	// 	}
+	// }()
+	select {}
+}
+
+func makeServer(listenAddress string, bootstrapServers []string) *server.Server {
 	server := server.NewServer()
+	go server.Start(listenAddress)
 
-	opts := []grpc.ServerOption{}
-	grpcServer := grpc.NewServer(opts...)
-
-	ln, err := net.Listen("tcp", ":3000")
-	if err != nil {
-		log.Fatal(err)
+	if len(bootstrapServers) > 0 {
+		if err := server.BootstrapNetwork(bootstrapServers); err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	blockchain.RegisterBlockChainServer(grpcServer, server)
-	fmt.Println("node running on port:", 3000)
-
-	go func() {
-		for {
-			time.Sleep(2 * time.Second)
-			makeTransaction()
-		}
-	}()
-
-	grpcServer.Serve(ln)
+	return server
 }
 
 func makeTransaction() {
@@ -50,8 +50,9 @@ func makeTransaction() {
 	defer cancel()
 	// _, err = c.HandleTransaction(ctx, &blockchain.Transaction{})
 	_, err = c.Handshake(ctx, &blockchain.HandshakeMessage{
-		Version: "blocker-0.1",
-		Height:  1,
+		Version:       "blocker-0.1",
+		Height:        1,
+		ListenAddress: "1.1.1.1:4000",
 	})
 	if err != nil {
 		log.Fatal(err)
