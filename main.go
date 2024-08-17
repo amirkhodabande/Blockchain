@@ -13,26 +13,19 @@ import (
 
 func main() {
 	makeServer(":3000", []string{})
-	makeServer(":4300", []string{":3000"})
+	time.Sleep(time.Second)
+	makeServer(":4000", []string{":3000"})
 
-	// go func() {
-	// 	for {
-	// 		time.Sleep(2 * time.Second)
-	// 		makeTransaction()
-	// 	}
-	// }()
+	time.Sleep(time.Second)
+	makeServer(":5000", []string{":4000"})
+
+	// makeTransaction()
 	select {}
 }
 
 func makeServer(listenAddress string, bootstrapServers []string) *server.Server {
 	server := server.NewServer()
-	go server.Start(listenAddress)
-
-	if len(bootstrapServers) > 0 {
-		if err := server.BootstrapNetwork(bootstrapServers); err != nil {
-			log.Fatal(err)
-		}
-	}
+	go server.Start(listenAddress, bootstrapServers)
 
 	return server
 }

@@ -33,41 +33,7 @@ func NewServer() *Server {
 	}
 }
 
-func (server *Server) addPeer(client blockchain.BlockChainClient, message *blockchain.HandshakeMessage) {
-	server.peerLock.Lock()
-	defer server.peerLock.Unlock()
-
-	server.logger.Debugf("[%s]: new peer connected (%s) - height (%d)", server.listenAddress, message.ListenAddress, message.Height)
-
-	server.peers[client] = message
-}
-
-func (server *Server) deletePeer(c blockchain.BlockChainClient) {
-	server.peerLock.Lock()
-	defer server.peerLock.Unlock()
-
-	delete(server.peers, c)
-}
-
-func (server *Server) BootstrapNetwork(addresses []string) error {
-	for _, address := range addresses {
-		client, err := makeBlockChainClient(address)
-		if err != nil {
-			return err
-		}
-
-		version, err := client.Handshake(context.Background(), server.getVersion())
-		if err != nil {
-			server.logger.Info("handshake error:", err)
-			continue
-		}
-
-		server.addPeer(client, version)
-	}
-	return nil
-}
-
-func (server *Server) Start(listenAddress string) error {
+func (server *Server) Start(listenAddress string, bootstrapServers []string) error {
 	server.listenAddress = listenAddress
 	opts := []grpc.ServerOption{}
 	grpcServer := grpc.NewServer(opts...)
@@ -78,8 +44,11 @@ func (server *Server) Start(listenAddress string) error {
 	}
 
 	blockchain.RegisterBlockChainServer(grpcServer, server)
-
 	server.logger.Info("node running on port:", listenAddress)
+
+	if len(bootstrapServers) > 0 {
+		go server.bootstrapNetwork(bootstrapServers)
+	}
 
 	return grpcServer.Serve(ln)
 }
@@ -102,12 +71,91 @@ func (server *Server) HandleTransaction(ctx context.Context, tx *blockchain.Tran
 	return &blockchain.Ack{}, nil
 }
 
+func (server *Server) addPeer(client blockchain.BlockChainClient, message *blockchain.HandshakeMessage) {
+	server.peerLock.Lock()
+	defer server.peerLock.Unlock()
+
+	if len(message.PeerList) > 0 {
+		go server.bootstrapNetwork(message.PeerList)
+	}
+
+	server.peers[client] = message
+	server.logger.Debugf("[%s]: new peer connected (%s) - height (%d)", server.listenAddress, message.ListenAddress, message.Height)
+}
+
+func (server *Server) deletePeer(c blockchain.BlockChainClient) {
+	server.peerLock.Lock()
+	defer server.peerLock.Unlock()
+
+	delete(server.peers, c)
+}
+
+func (server *Server) bootstrapNetwork(addresses []string) error {
+	for _, address := range addresses {
+		if !server.canConnectWith(address) {
+			continue
+		}
+
+		server.logger.Debugw("dialing remote server", "from", server.listenAddress, "to", address)
+		client, version, err := server.dialRemoteServer(address)
+		if err != nil {
+			server.logger.Info("handshake error:", err)
+			continue
+		}
+
+		server.addPeer(client, version)
+	}
+	return nil
+}
+
+func (server *Server) dialRemoteServer(listenAddress string) (blockchain.BlockChainClient, *blockchain.HandshakeMessage, error) {
+	client, err := makeBlockChainClient(listenAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	version, err := client.Handshake(context.Background(), server.getVersion())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return client, version, err
+}
+
 func (server *Server) getVersion() *blockchain.HandshakeMessage {
 	return &blockchain.HandshakeMessage{
 		Version:       "blocker-0.1",
 		Height:        0,
 		ListenAddress: server.listenAddress,
+		PeerList:      server.getPeerList(),
 	}
+}
+
+func (server *Server) canConnectWith(address string) bool {
+	if server.listenAddress == address {
+		return false
+	}
+
+	connectedPeers := server.getPeerList()
+	for _, listenAddress := range connectedPeers {
+		if address == listenAddress {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (server *Server) getPeerList() []string {
+	server.peerLock.RLock()
+	defer server.peerLock.RUnlock()
+
+	peers := []string{}
+	for _, version := range server.peers {
+		peers = append(peers, version.ListenAddress)
+	}
+
+	return peers
 }
 
 func makeBlockChainClient(listenAddress string) (blockchain.BlockChainClient, error) {
