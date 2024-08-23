@@ -13,12 +13,15 @@ func SignBlock(privateKey *crypto.PrivateKey, block *blockchain.Block) *crypto.S
 }
 
 func HashBlock(block *blockchain.Block) []byte {
-	b, err := proto.Marshal(block)
+	return HashHeader(block.Header)
+}
+
+func HashHeader(header *blockchain.Header) []byte {
+	b, err := proto.Marshal(header)
 	if err != nil {
 		panic(err)
 	}
 
 	hash := sha256.Sum256(b)
-
 	return hash[:]
 }
