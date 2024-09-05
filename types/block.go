@@ -8,8 +8,29 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func VerifyBlock(block *blockchain.Block) bool {
+	if len(block.PublicKey) != crypto.PublicKeyLen {
+		return false
+	}
+
+	if len(block.Signature) != crypto.SignatureLen {
+		return false
+	}
+
+	sig := crypto.SignatureFromBytes(block.Signature)
+	publicKey := crypto.PublicKeyFromBytes(block.PublicKey)
+	hash := HashBlock(block)
+
+	return sig.Verify(publicKey, hash)
+}
+
 func SignBlock(privateKey *crypto.PrivateKey, block *blockchain.Block) *crypto.Signature {
-	return privateKey.Sign(HashBlock(block))
+	hash := HashBlock(block)
+	signature := privateKey.Sign(hash)
+	block.PublicKey = privateKey.Public().Bytes()
+	block.Signature = signature.Bytes()
+
+	return signature
 }
 
 func HashBlock(block *blockchain.Block) []byte {

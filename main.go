@@ -5,26 +5,39 @@ import (
 	"log"
 	"time"
 
+	"github.com/blockchain/crypto"
 	blockchain "github.com/blockchain/proto"
 	"github.com/blockchain/server"
+	"github.com/blockchain/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-	makeServer(":3000", []string{})
+	makeServer(":3000", []string{}, true)
 	time.Sleep(time.Second)
-	makeServer(":4000", []string{":3000"})
+	makeServer(":4000", []string{":3000"}, false)
 
 	time.Sleep(time.Second)
-	makeServer(":5000", []string{":4000"})
+	makeServer(":5000", []string{":4000"}, false)
 
-	// makeTransaction()
-	select {}
+	for {
+		time.Sleep(time.Second * 2)
+		makeTransaction()
+	}
 }
 
-func makeServer(listenAddress string, bootstrapServers []string) *server.Server {
-	server := server.NewServer()
+func makeServer(listenAddress string, bootstrapServers []string, isValidator bool) *server.Server {
+	serverConfig := server.ServerConfig{
+		Version:       "Blocker-1",
+		ListenAddress: listenAddress,
+	}
+
+	if isValidator {
+		serverConfig.PrivateKey = crypto.GeneratePrivateKey()
+	}
+
+	server := server.NewServer(serverConfig)
 	go server.Start(listenAddress, bootstrapServers)
 
 	return server
@@ -38,15 +51,28 @@ func makeTransaction() {
 	defer conn.Close()
 	c := blockchain.NewBlockChainClient(conn)
 
-	// Contact the server and print out its response.
+	privateKey := crypto.GeneratePrivateKey()
+	transaction := &blockchain.Transaction{
+		Version: 1,
+		Inputs: []*blockchain.TxInput{
+			{
+				PreviousTxHash:   util.RandomHash(),
+				PreviousOutIndex: 0,
+				PublicKey:        privateKey.Public().Bytes(),
+			},
+		},
+		Outputs: []*blockchain.TxOutput{
+			{
+				Amount:  99,
+				Address: privateKey.Public().Address().Bytes(),
+			},
+		},
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	// _, err = c.HandleTransaction(ctx, &blockchain.Transaction{})
-	_, err = c.Handshake(ctx, &blockchain.HandshakeMessage{
-		Version:       "blocker-0.1",
-		Height:        1,
-		ListenAddress: "1.1.1.1:4000",
-	})
+
+	_, err = c.HandleTransaction(ctx, transaction)
 	if err != nil {
 		log.Fatal(err)
 	}
