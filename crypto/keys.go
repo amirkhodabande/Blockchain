@@ -9,8 +9,8 @@ import (
 
 const (
 	privateKeyLen = 64
-	publicKeyLen  = 32
-	signatureLen  = 64
+	PublicKeyLen  = 32
+	SignatureLen  = 64
 	seedLen       = 32
 	addressLen    = 20
 )
@@ -20,7 +20,7 @@ type PrivateKey struct {
 }
 
 func SignatureFromBytes(b []byte) *Signature {
-	if len(b) != signatureLen {
+	if len(b) != SignatureLen {
 		panic("signature should be 64 bytes")
 	}
 
@@ -71,7 +71,7 @@ func (p *PrivateKey) Sign(msg []byte) *Signature {
 }
 
 func (p *PrivateKey) Public() *PublicKey {
-	b := make([]byte, publicKeyLen)
+	b := make([]byte, PublicKeyLen)
 	copy(b, p.key[32:])
 
 	return &PublicKey{
@@ -84,7 +84,7 @@ type PublicKey struct {
 }
 
 func PublicKeyFromBytes(b []byte) *PublicKey {
-	if len(b) != publicKeyLen {
+	if len(b) != PublicKeyLen {
 		panic("public key should be 32 bytes")
 	}
 

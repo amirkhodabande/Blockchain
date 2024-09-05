@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGeneratePrivateKey(t *testing.T) {
 	privateKey := GeneratePrivateKey()
 
-	assert.Equal(t, len(privateKey.Bytes()), privateKeyLen)
+	require.Equal(t, len(privateKey.Bytes()), privateKeyLen)
 
 	publicKey := privateKey.Public()
 
-	assert.Equal(t, len(publicKey.Bytes()), publicKeyLen)
+	require.Equal(t, len(publicKey.Bytes()), PublicKeyLen)
 }
 
 func TestNewPrivateKeyFromString(t *testing.T) {
@@ -23,9 +23,9 @@ func TestNewPrivateKeyFromString(t *testing.T) {
 		privateKey    = NewPrivateKeyFromString(stringKey)
 		addressString = "532714319995af6cac8fdcb39060a6ba0019f603"
 	)
-	assert.Equal(t, privateKeyLen, len(privateKey.Bytes()))
+	require.Equal(t, privateKeyLen, len(privateKey.Bytes()))
 	address := privateKey.Public().Address()
-	assert.Equal(t, addressString, address.String())
+	require.Equal(t, addressString, address.String())
 }
 
 func TestPrivateKeySign(t *testing.T) {
@@ -34,13 +34,13 @@ func TestPrivateKeySign(t *testing.T) {
 	msg := []byte("signed message")
 
 	sig := privateKey.Sign(msg)
-	assert.True(t, sig.Verify(publicKey, msg))
+	require.True(t, sig.Verify(publicKey, msg))
 
-	assert.False(t, sig.Verify(publicKey, []byte("not signed message")))
+	require.False(t, sig.Verify(publicKey, []byte("not signed message")))
 
 	anotherPrivateKey := GeneratePrivateKey()
 	anotherPublicKey := anotherPrivateKey.Public()
-	assert.False(t, sig.Verify(anotherPublicKey, msg))
+	require.False(t, sig.Verify(anotherPublicKey, msg))
 }
 
 func TestPublicKeyToAddress(t *testing.T) {
@@ -48,6 +48,6 @@ func TestPublicKeyToAddress(t *testing.T) {
 	publicKey := privateKey.Public()
 	address := publicKey.Address()
 
-	assert.Equal(t, addressLen, len(address.Bytes()))
+	require.Equal(t, addressLen, len(address.Bytes()))
 	fmt.Println(address)
 }

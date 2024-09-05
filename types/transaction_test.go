@@ -7,7 +7,7 @@ import (
 	"github.com/blockchain/crypto"
 	blockchain "github.com/blockchain/proto"
 	"github.com/blockchain/util"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewTransaction(t *testing.T) {
@@ -42,6 +42,6 @@ func TestNewTransaction(t *testing.T) {
 	sig := SignTransaction(fromPrivateKey, tx)
 	input.Signature = sig.Bytes()
 
-	assert.True(t, VerifyTransaction(tx))
+	require.True(t, VerifyTransaction(tx))
 	fmt.Println(input.Signature)
 }
