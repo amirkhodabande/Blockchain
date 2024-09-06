@@ -30,12 +30,12 @@ func SignatureFromBytes(b []byte) *Signature {
 }
 
 func NewPrivateKeyFromString(s string) *PrivateKey {
-	b, err := hex.DecodeString(s)
+	seedBytes, err := hex.DecodeString(s)
 	if err != nil {
 		panic(err)
 	}
 
-	return NewPrivateKeyFromSeed(b)
+	return NewPrivateKeyFromSeed(seedBytes)
 }
 
 func NewPrivateKeyFromSeed(seed []byte) *PrivateKey {
