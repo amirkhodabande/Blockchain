@@ -10,6 +10,8 @@ import (
 	"github.com/blockchain/types"
 )
 
+const seed = "ca2c1cdf74722ada1e4d152c96a8d2b184a656907b697bd3fd2e1e8abc377da9"
+
 type HeaderList struct {
 	headers []*blockchain.Header
 }
@@ -40,12 +42,14 @@ func (list *HeaderList) Len() int {
 }
 
 type Chain struct {
+	txStore    TXStorer
 	blockStore BlockStorer
 	headers    *HeaderList
 }
 
-func NewChain(blockStorer BlockStorer) *Chain {
+func NewChain(blockStorer BlockStorer, txStorer TXStorer) *Chain {
 	chain := &Chain{
+		txStore:    txStorer,
 		blockStore: blockStorer,
 		headers:    NewHeaderList(),
 	}
@@ -68,6 +72,12 @@ func (chain *Chain) AddBlock(block *blockchain.Block) error {
 
 func (chain *Chain) addBlock(block *blockchain.Block) error {
 	chain.headers.Add(block.Header)
+
+	for _, tx := range block.Transactions {
+		if err := chain.txStore.Put(tx); err != nil {
+			return err
+		}
+	}
 
 	return chain.blockStore.Put(block)
 }
@@ -107,7 +117,7 @@ func (chain *Chain) ValidateBlock(block *blockchain.Block) error {
 }
 
 func createGenesisBlock() *blockchain.Block {
-	privateKey := crypto.GeneratePrivateKey()
+	privateKey := crypto.NewPrivateKeyFromString(seed)
 
 	block := &blockchain.Block{
 		Header: &blockchain.Header{
@@ -115,6 +125,18 @@ func createGenesisBlock() *blockchain.Block {
 		},
 	}
 
+	tx := &blockchain.Transaction{
+		Version: 1,
+		Inputs:  []*blockchain.TxInput{},
+		Outputs: []*blockchain.TxOutput{
+			{
+				Amount:  1000,
+				Address: privateKey.Public().Address().Bytes(),
+			},
+		},
+	}
+
+	block.Transactions = append(block.Transactions, tx)
 	types.SignBlock(privateKey, block)
 
 	return block

@@ -9,6 +9,44 @@ import (
 	"github.com/blockchain/types"
 )
 
+type TXStorer interface {
+	Put(*blockchain.Transaction) error
+	Get(hash string) (*blockchain.Transaction, error)
+}
+
+type MemoryTxStore struct {
+	lock sync.RWMutex
+	txx  map[string]*blockchain.Transaction
+}
+
+func NewMemoryTxStore() *MemoryTxStore {
+	return &MemoryTxStore{
+		txx: make(map[string]*blockchain.Transaction),
+	}
+}
+
+func (store *MemoryTxStore) Put(tx *blockchain.Transaction) error {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
+	hash := hex.EncodeToString(types.HashTransaction(tx))
+	store.txx[hash] = tx
+
+	return nil
+}
+
+func (store *MemoryTxStore) Get(hash string) (*blockchain.Transaction, error) {
+	store.lock.RLock()
+	defer store.lock.RUnlock()
+
+	tx, ok := store.txx[hash]
+	if !ok {
+		return nil, fmt.Errorf("could not find transaction with hash %s", hash)
+	}
+
+	return tx, nil
+}
+
 type BlockStorer interface {
 	Put(block *blockchain.Block) error
 	Get(hash string) (*blockchain.Block, error)
