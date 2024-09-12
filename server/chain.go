@@ -41,16 +41,25 @@ func (list *HeaderList) Len() int {
 	return len(list.headers)
 }
 
+type UTXO struct {
+	Hash     string
+	OutIndex int
+	Amount   int64
+	Spent    bool
+}
+
 type Chain struct {
 	txStore    TXStorer
 	blockStore BlockStorer
+	utxoStore  UTXOStorer
 	headers    *HeaderList
 }
 
-func NewChain(blockStorer BlockStorer, txStorer TXStorer) *Chain {
+func NewChain(blockStorer BlockStorer, txStorer TXStorer, utxoStore UTXOStorer) *Chain {
 	chain := &Chain{
 		txStore:    txStorer,
 		blockStore: blockStorer,
+		utxoStore:  utxoStore,
 		headers:    NewHeaderList(),
 	}
 	chain.addBlock(createGenesisBlock())
@@ -76,6 +85,21 @@ func (chain *Chain) addBlock(block *blockchain.Block) error {
 	for _, tx := range block.Transactions {
 		if err := chain.txStore.Put(tx); err != nil {
 			return err
+		}
+
+		hash := hex.EncodeToString(types.HashTransaction(tx))
+
+		for index, output := range tx.Outputs {
+			utxo := &UTXO{
+				Hash:     hash,
+				Amount:   output.Amount,
+				OutIndex: index,
+				Spent:    false,
+			}
+
+			if err := chain.utxoStore.Put(utxo); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -111,6 +135,46 @@ func (chain *Chain) ValidateBlock(block *blockchain.Block) error {
 	hash := types.HashBlock(currentBlock)
 	if !bytes.Equal(hash, block.Header.PreviousHash) {
 		return fmt.Errorf("invalid previous block hash")
+	}
+
+	for _, tx := range block.Transactions {
+		if err := chain.validateTransaction(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (chain *Chain) validateTransaction(tx *blockchain.Transaction) error {
+	if !types.VerifyTransaction(tx) {
+		return fmt.Errorf("invalid transaction signature")
+	}
+
+	nInputs := len(tx.Inputs)
+	sumInputs := 0
+
+	for i := 0; i < nInputs; i++ {
+		previousHash := hex.EncodeToString(tx.Inputs[i].PreviousTxHash)
+		key := fmt.Sprintf("%s_%d", previousHash, i)
+		utxo, err := chain.utxoStore.Get(key)
+		sumInputs += int(utxo.Amount)
+
+		if err != nil {
+			return err
+		}
+		if utxo.Spent {
+			return fmt.Errorf("input %d of tx %s is already spent", i, previousHash)
+		}
+	}
+
+	sumOutputs := 0
+	for _, output := range tx.Outputs {
+		sumOutputs += int(output.Amount)
+	}
+
+	if sumInputs < sumOutputs {
+		return fmt.Errorf("insufficient balance got (%d) spending (%d)", sumInputs, sumOutputs)
 	}
 
 	return nil

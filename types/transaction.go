@@ -24,11 +24,14 @@ func HashTransaction(tx *blockchain.Transaction) []byte {
 
 func VerifyTransaction(tx *blockchain.Transaction) bool {
 	for _, input := range tx.Inputs {
-		sig := crypto.SignatureFromBytes(input.Signature)
+		var (
+			signature = crypto.SignatureFromBytes(input.Signature)
+			publicKey = crypto.PublicKeyFromBytes(input.PublicKey)
+		)
 
 		// TODO: check issues of nil signature
 		input.Signature = nil
-		if !sig.Verify(crypto.PublicKeyFromBytes(input.PublicKey), HashTransaction(tx)) {
+		if !signature.Verify(publicKey, HashTransaction(tx)) {
 			return false
 		}
 	}

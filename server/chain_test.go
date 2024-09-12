@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"github.com/blockchain/crypto"
@@ -26,7 +25,7 @@ func randomBlock(t *testing.T, chain *Chain) *blockchain.Block {
 }
 
 func TestNewChain(t *testing.T) {
-	chain := NewChain(NewMemoryBlockStore(), NewMemoryTxStore())
+	chain := NewChain(NewMemoryBlockStore(), NewMemoryTxStore(), NewMemoryUTXOStore())
 	require.Equal(t, 0, chain.Height())
 
 	_, err := chain.GetBlockByHeight(0)
@@ -34,7 +33,7 @@ func TestNewChain(t *testing.T) {
 }
 
 func TestChainHeight(t *testing.T) {
-	chain := NewChain(NewMemoryBlockStore(), NewMemoryTxStore())
+	chain := NewChain(NewMemoryBlockStore(), NewMemoryTxStore(), NewMemoryUTXOStore())
 
 	for i := 1; i < 100; i++ {
 		block := randomBlock(t, chain)
@@ -45,7 +44,7 @@ func TestChainHeight(t *testing.T) {
 }
 
 func TestAddBlock(t *testing.T) {
-	chain := NewChain(NewMemoryBlockStore(), NewMemoryTxStore())
+	chain := NewChain(NewMemoryBlockStore(), NewMemoryTxStore(), NewMemoryUTXOStore())
 
 	for i := 1; i < 100; i++ {
 		block := randomBlock(t, chain)
@@ -64,19 +63,54 @@ func TestAddBlock(t *testing.T) {
 	}
 }
 
-func TestAddBlockWithTx(t *testing.T) {
+func TestAddBlockWithInsufficientBalance(t *testing.T) {
 	var (
-		chain      = NewChain(NewMemoryBlockStore(), NewMemoryTxStore())
+		chain      = NewChain(NewMemoryBlockStore(), NewMemoryTxStore(), NewMemoryUTXOStore())
 		block      = randomBlock(t, chain)
 		privateKey = crypto.NewPrivateKeyFromString(seed)
 		recipient  = crypto.GeneratePrivateKey().Public().Address().Bytes()
 	)
-	fetchedTransaction, err := chain.txStore.Get("f8dbd676cfebe8608250ef3bbf9b6a46cfb97ff58796329a0135b5511af57440")
+	previousTransaction, err := chain.txStore.Get("f8dbd676cfebe8608250ef3bbf9b6a46cfb97ff58796329a0135b5511af57440")
 	require.Nil(t, err)
 
 	inputs := []*blockchain.TxInput{
 		{
-			PreviousTxHash:   types.HashTransaction(fetchedTransaction),
+			PreviousTxHash:   types.HashTransaction(previousTransaction),
+			PreviousOutIndex: 0,
+			PublicKey:        privateKey.Public().Bytes(),
+		},
+	}
+	outputs := []*blockchain.TxOutput{
+		{
+			Amount:  1001,
+			Address: recipient,
+		},
+	}
+	tx := &blockchain.Transaction{
+		Version: 1,
+		Inputs:  inputs,
+		Outputs: outputs,
+	}
+	signature := types.SignTransaction(privateKey, tx)
+	tx.Inputs[0].Signature = signature.Bytes()
+
+	block.Transactions = append(block.Transactions, tx)
+	require.NotNil(t, chain.AddBlock(block))
+}
+
+func TestAddBlockWithTx(t *testing.T) {
+	var (
+		chain      = NewChain(NewMemoryBlockStore(), NewMemoryTxStore(), NewMemoryUTXOStore())
+		block      = randomBlock(t, chain)
+		privateKey = crypto.NewPrivateKeyFromString(seed)
+		recipient  = crypto.GeneratePrivateKey().Public().Address().Bytes()
+	)
+	previousTransaction, err := chain.txStore.Get("f8dbd676cfebe8608250ef3bbf9b6a46cfb97ff58796329a0135b5511af57440")
+	require.Nil(t, err)
+
+	inputs := []*blockchain.TxInput{
+		{
+			PreviousTxHash:   types.HashTransaction(previousTransaction),
 			PreviousOutIndex: 0,
 			PublicKey:        privateKey.Public().Bytes(),
 		},
@@ -87,7 +121,7 @@ func TestAddBlockWithTx(t *testing.T) {
 			Address: recipient,
 		},
 		{
-			Amount: 900,
+			Amount:  900,
 			Address: privateKey.Public().Address().Bytes(),
 		},
 	}
@@ -96,13 +130,9 @@ func TestAddBlockWithTx(t *testing.T) {
 		Inputs:  inputs,
 		Outputs: outputs,
 	}
+	signature := types.SignTransaction(privateKey, tx)
+	tx.Inputs[0].Signature = signature.Bytes()
+
 	block.Transactions = append(block.Transactions, tx)
 	require.Nil(t, chain.AddBlock(block))
-
-	txHash := hex.EncodeToString(types.HashTransaction(tx))
-
-	fetchedTx, err := chain.txStore.Get(txHash)
-
-	require.Nil(t, err)
-	require.Equal(t, tx, fetchedTx)
 }
