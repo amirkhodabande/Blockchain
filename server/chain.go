@@ -101,6 +101,19 @@ func (chain *Chain) addBlock(block *blockchain.Block) error {
 				return err
 			}
 		}
+
+		for index, input := range tx.Inputs {
+			key := fmt.Sprintf("%s_%d", hex.EncodeToString(input.PreviousTxHash), index)
+			utxo, err := chain.utxoStore.Get(key)
+			if err != nil {
+				return err
+			}
+
+			utxo.Spent = true
+			if err := chain.utxoStore.Put(utxo); err != nil {
+				return err
+			}
+		}
 	}
 
 	return chain.blockStore.Put(block)
