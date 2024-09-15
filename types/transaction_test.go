@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/blockchain/crypto"
@@ -43,5 +42,4 @@ func TestNewTransaction(t *testing.T) {
 	input.Signature = sig.Bytes()
 
 	require.True(t, VerifyTransaction(tx))
-	fmt.Println(input.Signature)
 }

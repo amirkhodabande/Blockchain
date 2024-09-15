@@ -30,10 +30,13 @@ func VerifyTransaction(tx *blockchain.Transaction) bool {
 		)
 
 		// TODO: check issues of nil signature
+		tmpSignature := input.Signature
 		input.Signature = nil
+
 		if !signature.Verify(publicKey, HashTransaction(tx)) {
 			return false
 		}
+		input.Signature = tmpSignature
 	}
 	return true
 }

@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -49,5 +48,4 @@ func TestPublicKeyToAddress(t *testing.T) {
 	address := publicKey.Address()
 
 	require.Equal(t, addressLen, len(address.Bytes()))
-	fmt.Println(address)
 }

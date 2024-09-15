@@ -4,9 +4,26 @@ import (
 	"testing"
 
 	"github.com/blockchain/crypto"
+	blockchain "github.com/blockchain/proto"
 	"github.com/blockchain/util"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCalculateRootHash(t *testing.T) {
+	var (
+		privateKey = crypto.GeneratePrivateKey()
+		block      = util.RandomBlock()
+		tx         = &blockchain.Transaction{
+			Version: 1,
+		}
+	)
+
+	block.Transactions = append(block.Transactions, tx)
+	SignBlock(privateKey, block)
+
+	require.True(t, verifyRootHash(block))
+	require.Equal(t, 32, len(block.Header.RootHash))
+}
 
 func TestSignVerifyBlock(t *testing.T) {
 	var (
